@@ -18,10 +18,32 @@ An animated travel-route map — a single-file React component that plots your t
 - [ ] Optional dates + drag-to-reorder stops
 - [ ] Camera-follow zoom and great-circle arcs
 - [ ] Shareable trip links / JSON import-export
+- [x] Runnable Vite app + multi-stage Dockerfile (nginx)
 
 ## Usage
 
-Drop `flight-log.jsx` into a React app. Dependencies: `react`, `lucide-react`.
+**Run the dev server:**
+
+```bash
+npm install
+npm run dev        # http://localhost:5173
+```
+
+**Build for production:**
+
+```bash
+npm run build      # static files in dist/
+npm run preview    # serve the build locally
+```
+
+**Run with Docker:**
+
+```bash
+docker build -t flight-log .
+docker run -p 8080:80 flight-log     # http://localhost:8080
+```
+
+**Use the component directly** — drop `flight-log.jsx` into any React app. Dependencies: `react`, `react-dom`, `lucide-react`.
 
 ```jsx
 import TravelRouteMap from './flight-log';
