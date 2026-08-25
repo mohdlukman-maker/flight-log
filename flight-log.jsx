@@ -40,7 +40,12 @@ function haversineKm(a, b) {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-function arcPath(from, to) {
+/* ---------- Arc geometry (pure math, no DOM) ----------
+   A leg's visual path is a quadratic Bézier: start point, a control point
+   bowed toward the top of the screen, and the end point. Keeping the geometry
+   in pure functions (instead of SVG DOM getPointAtLength) makes playback
+   deterministic and seekable — the foundation for MP4 export later. */
+function legBezier(from, to) {
   const a = project(from.lat, from.lng);
   const b = project(to.lat, to.lng);
   const dx = b.x - a.x;
@@ -55,9 +60,65 @@ function arcPath(from, to) {
     ny = -ny;
   } // always bow toward top of screen
   const bow = Math.min(dist * 0.28, 90);
-  const cx = mx + nx * bow;
-  const cy = my + ny * bow;
-  return `M${a.x.toFixed(1)},${a.y.toFixed(1)} Q${cx.toFixed(1)},${cy.toFixed(1)} ${b.x.toFixed(1)},${b.y.toFixed(1)}`;
+  return {
+    p0: a,
+    p1: { x: mx + nx * bow, y: my + ny * bow }, // control point
+    p2: b,
+  };
+}
+
+function qPoint(bz, t) {
+  const u = 1 - t;
+  const x = u * u * bz.p0.x + 2 * u * t * bz.p1.x + t * t * bz.p2.x;
+  const y = u * u * bz.p0.y + 2 * u * t * bz.p1.y + t * t * bz.p2.y;
+  return { x, y };
+}
+
+function qTangent(bz, t) {
+  const u = 1 - t;
+  // Derivative of the quadratic Bézier
+  const x = 2 * (u * (bz.p1.x - bz.p0.x) + t * (bz.p2.x - bz.p1.x));
+  const y = 2 * (u * (bz.p1.y - bz.p0.y) + t * (bz.p2.y - bz.p1.y));
+  return { x, y };
+}
+
+/** Arc-length lookup table: lets us move along the curve at constant speed.
+ *  samples[i] = { t, len } — cumulative length from t=0 to t=sample.t */
+function buildArcLUT(bz, n = 64) {
+  const samples = [{ t: 0, len: 0 }];
+  let len = 0;
+  let prev = qPoint(bz, 0);
+  for (let i = 1; i <= n; i++) {
+    const t = i / n;
+    const cur = qPoint(bz, t);
+    len += Math.hypot(cur.x - prev.x, cur.y - prev.y);
+    samples.push({ t, len });
+    prev = cur;
+  }
+  return { samples, total: len };
+}
+
+/** Fraction f in [0,1] of arc length → parametric t on the curve */
+function tAtFraction(lut, f) {
+  const target = Math.max(0, Math.min(1, f)) * lut.total;
+  // binary search over cumulative lengths
+  let lo = 0;
+  let hi = lut.samples.length - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (lut.samples[mid].len <= target) lo = mid;
+    else hi = mid;
+  }
+  const a = lut.samples[lo];
+  const b = lut.samples[hi];
+  const seg = b.len - a.len;
+  const local = seg > 0 ? (target - a.len) / seg : 0;
+  return a.t + local * (b.t - a.t);
+}
+
+function arcPath(from, to) {
+  const bz = legBezier(from, to);
+  return `M${bz.p0.x.toFixed(1)},${bz.p0.y.toFixed(1)} Q${bz.p1.x.toFixed(1)},${bz.p1.y.toFixed(1)} ${bz.p2.x.toFixed(1)},${bz.p2.y.toFixed(1)}`;
 }
 
 function formatDate(iso) {
@@ -84,6 +145,73 @@ function PlaneGlyph({ x, y, angle, color }) {
 const LEG_MS = 2600; // base ms per leg at speed = 1
 const STOP_PAUSE_MS = 650;
 
+/* ---------- Pure playback timeline ----------
+   stateAt(t, legs) maps a timeline position t ∈ [0,1] to the full observable
+   playback state: which leg, how far along it (by arc length), where the plane
+   is, and which pins are "past". Deterministic — same t always renders the
+   same frame. This is what makes seek, restart, and (later) MP4 export exact. */
+function stateAt(t, legs) {
+  if (!legs.length) {
+    return { legIndex: 0, legT: 0, plane: null, isPast: () => false, finished: false };
+  }
+  // Per-leg real-time weights: flight time + stop pause after each leg.
+  const legMs = LEG_MS;
+  const pauseMs = STOP_PAUSE_MS;
+  const totalMs = legs.length * legMs + (legs.length - 1) * pauseMs;
+  const ms = Math.max(0, Math.min(1, t)) * totalMs;
+
+  let legIndex = 0;
+  let legT = 0;
+  let inPause = false;
+
+  // Walk through legs, each occupying [legStart, legEnd], then a pause.
+  // At a boundary exactly equal to legEnd we stay on the current leg at t=1
+  // (so the plane is parked at the arrived stop, not snapped forward).
+  for (let i = 0; i < legs.length; i++) {
+    const legStart = i * (legMs + pauseMs);
+    const legEnd = legStart + legMs;
+    if (ms <= legEnd || i === legs.length - 1) {
+      legIndex = i;
+      if (ms <= legStart) {
+        legT = 0;
+        inPause = i > 0; // sitting at a stop before departing
+      } else {
+        legT = Math.min(1, (ms - legStart) / legMs);
+        inPause = false;
+      }
+      break;
+    }
+  }
+  if (ms >= totalMs) {
+    legIndex = legs.length - 1;
+    legT = 1;
+    inPause = false;
+  }
+
+  const leg = legs[legIndex];
+  const tt = tAtFraction(leg.lut, legT);
+  const pos = qPoint(leg.bz, tt);
+  const tan = qTangent(leg.bz, tt);
+  const angle = (Math.atan2(tan.y, tan.x) * 180) / Math.PI;
+  const plane = { x: pos.x, y: pos.y, angle, inPause };
+
+  return {
+    legIndex,
+    legT,
+    plane,
+    isPast: (stopIndex) => {
+      // Stops we've fully left behind: indices < current leg's origin.
+      if (stopIndex < legIndex) return true;
+      // The origin of the current leg has been departed.
+      if (stopIndex === legIndex) return true;
+      // The destination of the current leg counts as past only when we've arrived.
+      if (stopIndex === legIndex + 1 && legT >= 1) return true;
+      return false;
+    },
+    finished: legIndex === legs.length - 1 && legT >= 1,
+  };
+}
+
 export default function TravelRouteMap() {
   const [stops, setStops] = useState([]);
   const [loaded, setLoaded] = useState(false);
@@ -97,17 +225,17 @@ export default function TravelRouteMap() {
   const [hoveredId, setHoveredId] = useState(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentLeg, setCurrentLeg] = useState(0);
-  const [legProgress, setLegProgress] = useState(0);
   const [speed, setSpeed] = useState(1);
 
-  const legRefs = useRef([]);
+  // Single source of truth for playback position: milliseconds along the
+  // timeline. The pure stateAt(t) function derives everything else from it.
+  // playheadMsRef drives the rAF loop without re-rendering on every frame;
+  // a state mirror is bumped once per frame to trigger render.
+  const [playhead, setPlayhead] = useState(0); // ms, for rendering
+  const playheadMsRef = useRef(0);
   const rafRef = useRef(null);
   const lastTsRef = useRef(null);
-  const pauseUntilRef = useRef(0);
   const inputRef = useRef(null);
-  const currentLegRef = useRef(0);
-  const legProgressRef = useRef(0);
 
   /* ---- persistence ---- */
   useEffect(() => {
@@ -149,10 +277,20 @@ export default function TravelRouteMap() {
   const legs = useMemo(() => {
     const out = [];
     for (let i = 0; i < sortedStops.length - 1; i++) {
-      out.push({ from: sortedStops[i], to: sortedStops[i + 1], d: arcPath(sortedStops[i], sortedStops[i + 1]) });
+      const from = sortedStops[i];
+      const to = sortedStops[i + 1];
+      const bz = legBezier(from, to);
+      const lut = buildArcLUT(bz);
+      out.push({ from, to, d: arcPath(from, to), bz, lut });
     }
     return out;
   }, [sortedStops]);
+
+  // Total timeline duration for the current route (flight + stop pauses).
+  const totalMs = useMemo(
+    () => (legs.length ? legs.length * LEG_MS + (legs.length - 1) * STOP_PAUSE_MS : 0),
+    [legs.length]
+  );
 
   const totalKm = useMemo(() => {
     let sum = 0;
@@ -167,20 +305,18 @@ export default function TravelRouteMap() {
     return Math.round((last - first) / 86400000);
   }, [sortedStops]);
 
+  // When the route changes, snap playhead back to start and stop playing.
   const routeKey = sortedStops.map((s) => s.id).join(',');
   useEffect(() => {
     setIsPlaying(false);
-    setCurrentLeg(0);
-    setLegProgress(0);
-    currentLegRef.current = 0;
-    legProgressRef.current = 0;
-    pauseUntilRef.current = 0;
+    playheadMsRef.current = 0;
+    setPlayhead(0);
     lastTsRef.current = null;
   }, [routeKey]);
 
-  /* ---- animation loop ---- */
+  /* ---- animation loop: drive the single playhead value ---- */
   useEffect(() => {
-    if (!isPlaying) {
+    if (!isPlaying || totalMs === 0) {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       return;
     }
@@ -189,59 +325,30 @@ export default function TravelRouteMap() {
       const dt = ts - lastTsRef.current;
       lastTsRef.current = ts;
 
-      if (ts < pauseUntilRef.current) {
-        rafRef.current = requestAnimationFrame(step);
+      let next = playheadMsRef.current + dt * speed;
+      if (next >= totalMs) {
+        next = totalMs; // hold at the very end
+        playheadMsRef.current = next;
+        setPlayhead(next);
+        setIsPlaying(false);
         return;
       }
-
-      const next = legProgressRef.current + dt / (LEG_MS / speed);
-
-      if (next >= 1) {
-        const isLast = currentLegRef.current >= legs.length - 1;
-        if (isLast) {
-          // Arrived at the final destination: hold exactly at the end of the path
-          // instead of resetting to 0, which would visually snap the plane
-          // back to the previous city.
-          legProgressRef.current = 1;
-          setLegProgress(1);
-          setIsPlaying(false);
-          return;
-        }
-        currentLegRef.current += 1;
-        legProgressRef.current = 0;
-        pauseUntilRef.current = performance.now() + STOP_PAUSE_MS;
-        setCurrentLeg(currentLegRef.current);
-        setLegProgress(0);
-      } else {
-        legProgressRef.current = next;
-        setLegProgress(next);
-      }
-
+      playheadMsRef.current = next;
+      setPlayhead(next);
       rafRef.current = requestAnimationFrame(step);
     };
     rafRef.current = requestAnimationFrame(step);
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [isPlaying, speed, legs.length]);
+  }, [isPlaying, speed, totalMs]);
 
-  function getPlanePosition() {
-    if (legs.length === 0) return null;
-    const el = legRefs.current[currentLeg];
-    if (!el) {
-      const p = project(legs[0].from.lat, legs[0].from.lng);
-      return { x: p.x, y: p.y, angle: 0 };
-    }
-    const total = el.getTotalLength();
-    const t = Math.min(legProgress, 1);
-    const pt = el.getPointAtLength(t * total);
-    const pt2 = el.getPointAtLength(Math.min(t + 0.015, 1) * total);
-    let angle = (Math.atan2(pt2.y - pt.y, pt2.x - pt.x) * 180) / Math.PI;
-    if (Math.abs(pt2.x - pt.x) < 0.001 && Math.abs(pt2.y - pt.y) < 0.001) angle = 0;
-    return { x: pt.x, y: pt.y, angle };
-  }
-
-  const plane = getPlanePosition();
+  // Derive the visible frame from the playhead via the pure function.
+  const frame = useMemo(
+    () => stateAt(totalMs > 0 ? playhead / totalMs : 0, legs),
+    [playhead, totalMs, legs]
+  );
+  const plane = frame.plane;
 
   /* ---- city search ---- */
   function handleQueryChange(v) {
@@ -344,31 +451,25 @@ export default function TravelRouteMap() {
 
   function togglePlay() {
     if (legs.length === 0) return;
-    const finished = currentLeg >= legs.length - 1 && legProgress >= 1;
-    if (!isPlaying && finished) {
-      setCurrentLeg(0);
-      setLegProgress(0);
-      currentLegRef.current = 0;
-      legProgressRef.current = 0;
+    // If we're at the end, restart from 0
+    if (!isPlaying && playheadMsRef.current >= totalMs) {
+      playheadMsRef.current = 0;
+      setPlayhead(0);
     }
     lastTsRef.current = null;
-    pauseUntilRef.current = 0;
     setIsPlaying((p) => !p);
   }
 
   function resetPlay() {
     setIsPlaying(false);
-    setCurrentLeg(0);
-    setLegProgress(0);
-    currentLegRef.current = 0;
-    legProgressRef.current = 0;
-    pauseUntilRef.current = 0;
+    playheadMsRef.current = 0;
+    setPlayhead(0);
     lastTsRef.current = null;
   }
 
-  const activeLeg = legs[Math.min(currentLeg, legs.length - 1)];
-  const tripFinished = legs.length > 0 && currentLeg >= legs.length - 1 && legProgress >= 0.999 && !isPlaying;
-  const atStart = currentLeg === 0 && legProgress === 0 && !isPlaying && !tripFinished;
+  const activeLeg = legs[Math.min(frame.legIndex, legs.length - 1)];
+  const tripFinished = legs.length > 0 && frame.finished && !isPlaying;
+  const atStart = playhead === 0 && !isPlaying && !tripFinished;
 
   return (
     <div className="flg-root">
@@ -727,11 +828,10 @@ export default function TravelRouteMap() {
             {legs.map((leg, i) => (
               <path
                 key={`${leg.from.id}-${leg.to.id}`}
-                ref={(el) => (legRefs.current[i] = el)}
                 d={leg.d}
                 fill="none"
-                stroke={i === currentLeg ? COLORS.ember : COLORS.emberDim}
-                strokeWidth={i === currentLeg ? 1.6 : 1.1}
+                stroke={i === frame.legIndex ? COLORS.ember : COLORS.emberDim}
+                strokeWidth={i === frame.legIndex ? 1.6 : 1.1}
                 strokeDasharray="4 3"
                 strokeLinecap="round"
               />
@@ -739,7 +839,7 @@ export default function TravelRouteMap() {
 
             {sortedStops.map((s, i) => {
               const p = project(s.lat, s.lng);
-              const isPast = i <= currentLeg || (i === currentLeg + 1 && legProgress >= 1);
+              const isPast = frame.isPast(i);
               return (
                 <g
                   key={s.id}
@@ -797,7 +897,7 @@ export default function TravelRouteMap() {
                   <div className="flg-readout-main">
                     {activeLeg.from.name.toUpperCase()} → {activeLeg.to.name.toUpperCase()}
                   </div>
-                  <div className="flg-readout-sub">ARR {formatDate(activeLeg.to.date)} · leg {currentLeg + 1} of {legs.length}</div>
+                  <div className="flg-readout-sub">ARR {formatDate(activeLeg.to.date)} · leg {frame.legIndex + 1} of {legs.length}</div>
                 </>
               )}
             </div>
