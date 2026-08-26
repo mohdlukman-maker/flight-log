@@ -237,14 +237,45 @@ export default function TravelRouteMap() {
   const lastTsRef = useRef(null);
   const inputRef = useRef(null);
 
-  /* ---- persistence ---- */
+  /* ---- persistence ----
+     Prefer the host-provided window.storage API; fall back to localStorage
+     so stops persist in a plain browser (the original code silently dropped
+     persistence when window.storage was absent, which is the common case). */
+  const storage = useMemo(() => {
+    if (typeof window !== 'undefined' && window.storage && typeof window.storage.get === 'function' && typeof window.storage.set === 'function') {
+      return {
+        async get(key) {
+          const res = await window.storage.get(key, false);
+          return res && res.value != null ? res.value : null;
+        },
+        async set(key, value) {
+          await window.storage.set(key, value, false);
+        },
+      };
+    }
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return {
+        async get(key) {
+          try { return window.localStorage.getItem(key); }
+          catch (e) { return null; }
+        },
+        async set(key, value) {
+          try { window.localStorage.setItem(key, value); }
+          catch (e) { /* quota / private mode */ }
+        },
+      };
+    }
+    // No storage at all (SSR, restricted iframe) — no-op.
+    return { async get() { return null; }, async set() {} };
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await window.storage.get('stops', false);
-        if (!cancelled && res && res.value) {
-          const parsed = JSON.parse(res.value);
+        const saved = await storage.get('flight-log:stops');
+        if (!cancelled && saved) {
+          const parsed = JSON.parse(saved);
           if (Array.isArray(parsed)) setStops(parsed);
         }
       } catch (e) {
@@ -256,18 +287,12 @@ export default function TravelRouteMap() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [storage]);
 
   useEffect(() => {
     if (!loaded) return;
-    (async () => {
-      try {
-        await window.storage.set('stops', JSON.stringify(stops), false);
-      } catch (e) {
-        console.error('Could not save trip', e);
-      }
-    })();
-  }, [stops, loaded]);
+    storage.set('flight-log:stops', JSON.stringify(stops));
+  }, [stops, loaded, storage]);
 
   /* ---- derived route ---- */
   const sortedStops = useMemo(() => {
