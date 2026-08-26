@@ -236,6 +236,7 @@ export default function TravelRouteMap() {
   const rafRef = useRef(null);
   const lastTsRef = useRef(null);
   const inputRef = useRef(null);
+  const blurTimeoutRef = useRef(null);
 
   /* ---- persistence ----
      Prefer the host-provided window.storage API; fall back to localStorage
@@ -420,10 +421,17 @@ export default function TravelRouteMap() {
     if (!city) {
       setGeocoding(true);
       setFormError('');
+      // Nominatim is a free, unmetered, shared OSM service — it can and does
+      // hang silently. Abort + timeout so the "Finding…" state can't wedge.
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
       try {
         const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query.trim())}`
+          `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query.trim())}`,
+          { signal: controller.signal }
         );
+        clearTimeout(timeoutId);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (data && data[0]) {
           city = {
@@ -434,7 +442,13 @@ export default function TravelRouteMap() {
           };
         }
       } catch (e) {
-        /* handled below */
+        clearTimeout(timeoutId);
+        if (e.name === 'AbortError') {
+          setFormError('Location lookup timed out — try again, or pick a city from the suggestions');
+          setGeocoding(false);
+          return;
+        }
+        /* network/CORS/parse errors: fall through to the "couldn't find" branch below */
       }
       setGeocoding(false);
     }
@@ -471,6 +485,22 @@ export default function TravelRouteMap() {
       } else {
         handleAdd();
       }
+    } else if (e.key === 'Escape' && suggestions.length > 0) {
+      setSuggestions([]);
+      e.stopPropagation(); // don't let Escape close other things (modals, etc.)
+    }
+  }
+
+  // Close the suggestion list when focus leaves the input — but wait a tick so
+  // a mousedown on a suggestion still lands (blur fires before click).
+  function handleInputBlur() {
+    blurTimeoutRef.current = setTimeout(() => setSuggestions([]), 120);
+  }
+
+  function handleInputFocus() {
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current);
+      blurTimeoutRef.current = null;
     }
   }
 
@@ -779,6 +809,8 @@ export default function TravelRouteMap() {
                 value={query}
                 onChange={(e) => handleQueryChange(e.target.value)}
                 onKeyDown={handleKeyDown}
+                onBlur={handleInputBlur}
+                onFocus={handleInputFocus}
               />
               {suggestions.length > 0 && (
                 <div className="flg-suggestions">
