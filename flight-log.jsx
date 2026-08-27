@@ -455,18 +455,34 @@ function drawFrame(ctx, { frame, legs, sortedStops, totalKm, tripTitle, photoIma
   }
 
   // Postcard reveal: when the plane is dwelling at a stop with a photo,
-  // draw the photo as a postcard overlay, sized to the output frame.
-  if (frame.pausedAtStopIndex !== null && photoImages) {
+  // draw the photo as a postcard overlay that slides up from the bottom.
+  // pauseProgress (0..1) drives the animation: slide-in during first 25%,
+  // hold during middle, slide-out during last 25%.
+  if (frame.pausedAtStopIndex !== null && frame.pauseProgress !== undefined && photoImages) {
     const stopIdx = frame.pausedAtStopIndex;
     const stop = sortedStops[stopIdx];
     if (stop) {
       const img = photoImages[stop.id];
       if (img && img.width > 0) {
+        // Animate the postcard Y offset based on pause progress with easing.
+        const pp = frame.pauseProgress;
+        let slideOffset = 0; // 0 = fully visible, 1 = fully below screen
+        if (pp < 0.25) {
+          // Sliding in: ease from below (offset=1) to visible (offset=0)
+          slideOffset = 1 - smoothstep(pp / 0.25);
+        } else if (pp > 0.75) {
+          // Sliding out: ease from visible (offset=0) to below (offset=1)
+          slideOffset = smoothstep((pp - 0.75) / 0.25);
+        }
         // Postcard sized relative to the output frame
         const pcW = Math.min(480, W * 0.82);
         const pcH = pcW * (2 / 3);
         const pcX = (W - pcW) / 2;
-        const pcY = H * 0.5 - pcH / 2;
+        const pcBaseY = H * 0.5 - pcH / 2;
+        const pcY = pcBaseY + slideOffset * (H - pcBaseY + pcH); // slide down off-screen
+        // Alpha fade during slide
+        const alpha = 1 - slideOffset * 0.7;
+        ctx.globalAlpha = alpha;
         // Shadow
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
         ctx.fillRect(pcX + 6, pcY + 6, pcW, pcH);
@@ -499,6 +515,7 @@ function drawFrame(ctx, { frame, legs, sortedStops, totalKm, tripTitle, photoIma
         ctx.textBaseline = 'middle';
         const label = `${stop.name}${stop.caption ? ' · ' + stop.caption : ''}`;
         ctx.fillText(label.slice(0, 48), pcX, pcY + pcH + 12);
+        ctx.globalAlpha = 1;
       }
     }
   }
@@ -561,10 +578,16 @@ function stateAt(t, legs) {
   // after leg i, we're sitting at stop i+1 (the arrived destination).
   const finished = legIndex === legs.length - 1 && legT >= 1;
   let pausedAtStopIndex = null;
+  let pauseProgress = 0; // 0..1 — how far into the pause (for postcard animation)
   if (inPause) {
     pausedAtStopIndex = legIndex + 1;
+    // Compute progress within the pause window.
+    const legEnd = legIndex * (legMs + pauseMs) + legMs;
+    const msIntoPause = ms - legEnd;
+    pauseProgress = Math.max(0, Math.min(1, msIntoPause / pauseMs));
   } else if (finished) {
     pausedAtStopIndex = legs.length; // final destination = stops.length
+    pauseProgress = 1; // fully settled
   }
 
   return {
@@ -572,6 +595,7 @@ function stateAt(t, legs) {
     legT,
     plane,
     pausedAtStopIndex,
+    pauseProgress,
     isPast: (stopIndex) => {
       // Stops we've fully left behind: indices < current leg's origin.
       if (stopIndex < legIndex) return true;
