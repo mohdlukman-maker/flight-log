@@ -6,18 +6,56 @@ const LAND_PATH = "M335,472L334,474L333,475L327,475L321,475L317,474L316,473L322,
 const CITIES=[{"name":"Kuching","country":"Malaysia","lat":1.55,"lng":110.36},{"name":"Kuala Lumpur","country":"Malaysia","lat":3.14,"lng":101.69},{"name":"Kota Kinabalu","country":"Malaysia","lat":5.98,"lng":116.07},{"name":"Johor Bahru","country":"Malaysia","lat":1.49,"lng":103.74},{"name":"George Town","country":"Malaysia","lat":5.41,"lng":100.34},{"name":"Malacca City","country":"Malaysia","lat":2.2,"lng":102.25},{"name":"Miri","country":"Malaysia","lat":4.4,"lng":113.99},{"name":"Sibu","country":"Malaysia","lat":2.29,"lng":111.83},{"name":"Bintulu","country":"Malaysia","lat":3.17,"lng":113.03},{"name":"Sandakan","country":"Malaysia","lat":5.84,"lng":118.12},{"name":"Ipoh","country":"Malaysia","lat":4.6,"lng":101.08},{"name":"Shah Alam","country":"Malaysia","lat":3.09,"lng":101.53},{"name":"Petaling Jaya","country":"Malaysia","lat":3.11,"lng":101.6},{"name":"Putrajaya","country":"Malaysia","lat":2.93,"lng":101.69},{"name":"Langkawi","country":"Malaysia","lat":6.35,"lng":99.8},{"name":"Kuantan","country":"Malaysia","lat":3.82,"lng":103.33},{"name":"Kuala Terengganu","country":"Malaysia","lat":5.33,"lng":103.14},{"name":"Alor Setar","country":"Malaysia","lat":6.12,"lng":100.37},{"name":"Kota Bharu","country":"Malaysia","lat":6.13,"lng":102.24},{"name":"Labuan","country":"Malaysia","lat":5.28,"lng":115.24},{"name":"Tawau","country":"Malaysia","lat":4.24,"lng":117.89},{"name":"Singapore","country":"Singapore","lat":1.35,"lng":103.82},{"name":"Jakarta","country":"Indonesia","lat":-6.21,"lng":106.85},{"name":"Denpasar","country":"Indonesia","lat":-8.65,"lng":115.22},{"name":"Surabaya","country":"Indonesia","lat":-7.25,"lng":112.75},{"name":"Bandung","country":"Indonesia","lat":-6.91,"lng":107.62},{"name":"Yogyakarta","country":"Indonesia","lat":-7.8,"lng":110.36},{"name":"Bangkok","country":"Thailand","lat":13.76,"lng":100.5},{"name":"Chiang Mai","country":"Thailand","lat":18.79,"lng":98.99},{"name":"Phuket","country":"Thailand","lat":7.88,"lng":98.39},{"name":"Manila","country":"Philippines","lat":14.6,"lng":120.98},{"name":"Cebu City","country":"Philippines","lat":10.32,"lng":123.9},{"name":"Davao","country":"Philippines","lat":7.07,"lng":125.61},{"name":"Hanoi","country":"Vietnam","lat":21.03,"lng":105.85},{"name":"Ho Chi Minh City","country":"Vietnam","lat":10.82,"lng":106.63},{"name":"Da Nang","country":"Vietnam","lat":16.05,"lng":108.2},{"name":"Phnom Penh","country":"Cambodia","lat":11.56,"lng":104.92},{"name":"Siem Reap","country":"Cambodia","lat":13.36,"lng":103.86},{"name":"Vientiane","country":"Laos","lat":17.97,"lng":102.6},{"name":"Yangon","country":"Myanmar","lat":16.87,"lng":96.2},{"name":"Bandar Seri Begawan","country":"Brunei","lat":4.94,"lng":114.94},{"name":"Dili","country":"Timor-Leste","lat":-8.56,"lng":125.57},{"name":"Tokyo","country":"Japan","lat":35.68,"lng":139.65},{"name":"Osaka","country":"Japan","lat":34.69,"lng":135.5},{"name":"Kyoto","country":"Japan","lat":35.01,"lng":135.77},{"name":"Sapporo","country":"Japan","lat":43.06,"lng":141.35},{"name":"Fukuoka","country":"Japan","lat":33.59,"lng":130.4},{"name":"Seoul","country":"South Korea","lat":37.57,"lng":126.98},{"name":"Busan","country":"South Korea","lat":35.18,"lng":129.08},{"name":"Beijing","country":"China","lat":39.9,"lng":116.41},{"name":"Shanghai","country":"China","lat":31.23,"lng":121.47},{"name":"Guangzhou","country":"China","lat":23.13,"lng":113.26},{"name":"Shenzhen","country":"China","lat":22.54,"lng":114.06},{"name":"Chengdu","country":"China","lat":30.57,"lng":104.07},{"name":"Xi'an","country":"China","lat":34.27,"lng":108.95},{"name":"Hong Kong","country":"China","lat":22.32,"lng":114.17},{"name":"Macau","country":"China","lat":22.2,"lng":113.55},{"name":"Taipei","country":"Taiwan","lat":25.03,"lng":121.57},{"name":"Kaohsiung","country":"Taiwan","lat":22.63,"lng":120.3},{"name":"Ulaanbaatar","country":"Mongolia","lat":47.89,"lng":106.91},{"name":"Pyongyang","country":"North Korea","lat":39.02,"lng":125.75},{"name":"New Delhi","country":"India","lat":28.61,"lng":77.21},{"name":"Mumbai","country":"India","lat":19.08,"lng":72.88},{"name":"Bangalore","country":"India","lat":12.97,"lng":77.59},{"name":"Chennai","country":"India","lat":13.08,"lng":80.27},{"name":"Kolkata","country":"India","lat":22.57,"lng":88.36},{"name":"Hyderabad","country":"India","lat":17.39,"lng":78.49},{"name":"Goa","country":"India","lat":15.3,"lng":74.12},{"name":"Jaipur","country":"India","lat":26.91,"lng":75.79},{"name":"Agra","country":"India","lat":27.18,"lng":78.02},{"name":"Colombo","country":"Sri Lanka","lat":6.93,"lng":79.85},{"name":"Kathmandu","country":"Nepal","lat":27.72,"lng":85.32},{"name":"Dhaka","country":"Bangladesh","lat":23.81,"lng":90.41},{"name":"Islamabad","country":"Pakistan","lat":33.68,"lng":73.05},{"name":"Karachi","country":"Pakistan","lat":24.86,"lng":67},{"name":"Lahore","country":"Pakistan","lat":31.55,"lng":74.34},{"name":"Thimphu","country":"Bhutan","lat":27.47,"lng":89.64},{"name":"Male","country":"Maldives","lat":4.18,"lng":73.51},{"name":"Almaty","country":"Kazakhstan","lat":43.24,"lng":76.94},{"name":"Astana","country":"Kazakhstan","lat":51.17,"lng":71.43},{"name":"Tashkent","country":"Uzbekistan","lat":41.3,"lng":69.24},{"name":"Bishkek","country":"Kyrgyzstan","lat":42.87,"lng":74.59},{"name":"Dushanbe","country":"Tajikistan","lat":38.56,"lng":68.79},{"name":"Ashgabat","country":"Turkmenistan","lat":37.95,"lng":58.38},{"name":"Dubai","country":"UAE","lat":25.2,"lng":55.27},{"name":"Abu Dhabi","country":"UAE","lat":24.45,"lng":54.38},{"name":"Doha","country":"Qatar","lat":25.29,"lng":51.53},{"name":"Riyadh","country":"Saudi Arabia","lat":24.71,"lng":46.68},{"name":"Jeddah","country":"Saudi Arabia","lat":21.54,"lng":39.17},{"name":"Mecca","country":"Saudi Arabia","lat":21.39,"lng":39.86},{"name":"Kuwait City","country":"Kuwait","lat":29.38,"lng":47.99},{"name":"Manama","country":"Bahrain","lat":26.23,"lng":50.59},{"name":"Muscat","country":"Oman","lat":23.59,"lng":58.41},{"name":"Amman","country":"Jordan","lat":31.95,"lng":35.93},{"name":"Beirut","country":"Lebanon","lat":33.89,"lng":35.5},{"name":"Baghdad","country":"Iraq","lat":33.31,"lng":44.36},{"name":"Tehran","country":"Iran","lat":35.69,"lng":51.39},{"name":"Jerusalem","country":"Israel","lat":31.77,"lng":35.21},{"name":"Tel Aviv","country":"Israel","lat":32.08,"lng":34.78},{"name":"Sanaa","country":"Yemen","lat":15.37,"lng":44.19},{"name":"Damascus","country":"Syria","lat":33.51,"lng":36.28},{"name":"Istanbul","country":"Turkey","lat":41.01,"lng":28.98},{"name":"Ankara","country":"Turkey","lat":39.93,"lng":32.86},{"name":"Cappadocia","country":"Turkey","lat":38.64,"lng":34.83},{"name":"London","country":"United Kingdom","lat":51.51,"lng":-0.13},{"name":"Edinburgh","country":"United Kingdom","lat":55.95,"lng":-3.19},{"name":"Manchester","country":"United Kingdom","lat":53.48,"lng":-2.24},{"name":"Dublin","country":"Ireland","lat":53.35,"lng":-6.26},{"name":"Paris","country":"France","lat":48.86,"lng":2.35},{"name":"Nice","country":"France","lat":43.7,"lng":7.27},{"name":"Lyon","country":"France","lat":45.76,"lng":4.84},{"name":"Amsterdam","country":"Netherlands","lat":52.37,"lng":4.9},{"name":"Brussels","country":"Belgium","lat":50.85,"lng":4.35},{"name":"Berlin","country":"Germany","lat":52.52,"lng":13.4},{"name":"Munich","country":"Germany","lat":48.14,"lng":11.58},{"name":"Frankfurt","country":"Germany","lat":50.11,"lng":8.68},{"name":"Hamburg","country":"Germany","lat":53.55,"lng":9.99},{"name":"Zurich","country":"Switzerland","lat":47.38,"lng":8.54},{"name":"Geneva","country":"Switzerland","lat":46.2,"lng":6.14},{"name":"Vienna","country":"Austria","lat":48.21,"lng":16.37},{"name":"Prague","country":"Czech Republic","lat":50.08,"lng":14.44},{"name":"Warsaw","country":"Poland","lat":52.23,"lng":21.01},{"name":"Krakow","country":"Poland","lat":50.06,"lng":19.94},{"name":"Budapest","country":"Hungary","lat":47.5,"lng":19.04},{"name":"Bucharest","country":"Romania","lat":44.43,"lng":26.1},{"name":"Sofia","country":"Bulgaria","lat":42.7,"lng":23.32},{"name":"Athens","country":"Greece","lat":37.98,"lng":23.73},{"name":"Santorini","country":"Greece","lat":36.39,"lng":25.46},{"name":"Rome","country":"Italy","lat":41.9,"lng":12.5},{"name":"Milan","country":"Italy","lat":45.46,"lng":9.19},{"name":"Venice","country":"Italy","lat":45.44,"lng":12.32},{"name":"Florence","country":"Italy","lat":43.77,"lng":11.26},{"name":"Naples","country":"Italy","lat":40.85,"lng":14.27},{"name":"Madrid","country":"Spain","lat":40.42,"lng":-3.7},{"name":"Barcelona","country":"Spain","lat":41.39,"lng":2.17},{"name":"Seville","country":"Spain","lat":37.39,"lng":-5.99},{"name":"Lisbon","country":"Portugal","lat":38.72,"lng":-9.14},{"name":"Porto","country":"Portugal","lat":41.15,"lng":-8.61},{"name":"Copenhagen","country":"Denmark","lat":55.68,"lng":12.57},{"name":"Stockholm","country":"Sweden","lat":59.33,"lng":18.07},{"name":"Oslo","country":"Norway","lat":59.91,"lng":10.75},{"name":"Bergen","country":"Norway","lat":60.39,"lng":5.32},{"name":"Helsinki","country":"Finland","lat":60.17,"lng":24.94},{"name":"Reykjavik","country":"Iceland","lat":64.15,"lng":-21.94},{"name":"Moscow","country":"Russia","lat":55.76,"lng":37.62},{"name":"St. Petersburg","country":"Russia","lat":59.93,"lng":30.34},{"name":"Kyiv","country":"Ukraine","lat":50.45,"lng":30.52},{"name":"Minsk","country":"Belarus","lat":53.9,"lng":27.57},{"name":"Vilnius","country":"Lithuania","lat":54.69,"lng":25.28},{"name":"Riga","country":"Latvia","lat":56.95,"lng":24.11},{"name":"Tallinn","country":"Estonia","lat":59.44,"lng":24.75},{"name":"Zagreb","country":"Croatia","lat":45.81,"lng":15.98},{"name":"Dubrovnik","country":"Croatia","lat":42.65,"lng":18.09},{"name":"Ljubljana","country":"Slovenia","lat":46.06,"lng":14.51},{"name":"Belgrade","country":"Serbia","lat":44.79,"lng":20.45},{"name":"Sarajevo","country":"Bosnia","lat":43.86,"lng":18.41},{"name":"Skopje","country":"North Macedonia","lat":42,"lng":21.43},{"name":"Tirana","country":"Albania","lat":41.33,"lng":19.82},{"name":"Bratislava","country":"Slovakia","lat":48.15,"lng":17.11},{"name":"Luxembourg City","country":"Luxembourg","lat":49.61,"lng":6.13},{"name":"Monaco","country":"Monaco","lat":43.74,"lng":7.42},{"name":"Valletta","country":"Malta","lat":35.9,"lng":14.51},{"name":"Cairo","country":"Egypt","lat":30.04,"lng":31.24},{"name":"Alexandria","country":"Egypt","lat":31.2,"lng":29.92},{"name":"Marrakech","country":"Morocco","lat":31.63,"lng":-7.99},{"name":"Casablanca","country":"Morocco","lat":33.57,"lng":-7.59},{"name":"Tunis","country":"Tunisia","lat":36.81,"lng":10.18},{"name":"Algiers","country":"Algeria","lat":36.75,"lng":3.06},{"name":"Tripoli","country":"Libya","lat":32.89,"lng":13.19},{"name":"Lagos","country":"Nigeria","lat":6.52,"lng":3.38},{"name":"Abuja","country":"Nigeria","lat":9.08,"lng":7.4},{"name":"Accra","country":"Ghana","lat":5.6,"lng":-0.19},{"name":"Dakar","country":"Senegal","lat":14.72,"lng":-17.47},{"name":"Abidjan","country":"Ivory Coast","lat":5.32,"lng":-4.03},{"name":"Addis Ababa","country":"Ethiopia","lat":9.03,"lng":38.74},{"name":"Nairobi","country":"Kenya","lat":-1.29,"lng":36.82},{"name":"Mombasa","country":"Kenya","lat":-4.04,"lng":39.67},{"name":"Dar es Salaam","country":"Tanzania","lat":-6.79,"lng":39.21},{"name":"Zanzibar City","country":"Tanzania","lat":-6.16,"lng":39.2},{"name":"Kampala","country":"Uganda","lat":0.35,"lng":32.58},{"name":"Kigali","country":"Rwanda","lat":-1.94,"lng":30.06},{"name":"Kinshasa","country":"DR Congo","lat":-4.44,"lng":15.27},{"name":"Luanda","country":"Angola","lat":-8.84,"lng":13.23},{"name":"Lusaka","country":"Zambia","lat":-15.39,"lng":28.32},{"name":"Harare","country":"Zimbabwe","lat":-17.83,"lng":31.05},{"name":"Victoria Falls","country":"Zimbabwe","lat":-17.93,"lng":25.83},{"name":"Gaborone","country":"Botswana","lat":-24.63,"lng":25.9},{"name":"Windhoek","country":"Namibia","lat":-22.56,"lng":17.08},{"name":"Cape Town","country":"South Africa","lat":-33.92,"lng":18.42},{"name":"Johannesburg","country":"South Africa","lat":-26.2,"lng":28.05},{"name":"Durban","country":"South Africa","lat":-29.86,"lng":31.02},{"name":"Maputo","country":"Mozambique","lat":-25.97,"lng":32.57},{"name":"Antananarivo","country":"Madagascar","lat":-18.88,"lng":47.51},{"name":"Port Louis","country":"Mauritius","lat":-20.16,"lng":57.5},{"name":"Khartoum","country":"Sudan","lat":15.5,"lng":32.56},{"name":"New York","country":"USA","lat":40.71,"lng":-74.01},{"name":"Los Angeles","country":"USA","lat":34.05,"lng":-118.24},{"name":"San Francisco","country":"USA","lat":37.77,"lng":-122.42},{"name":"Chicago","country":"USA","lat":41.88,"lng":-87.63},{"name":"Miami","country":"USA","lat":25.76,"lng":-80.19},{"name":"Las Vegas","country":"USA","lat":36.17,"lng":-115.14},{"name":"Seattle","country":"USA","lat":47.61,"lng":-122.33},{"name":"Boston","country":"USA","lat":42.36,"lng":-71.06},{"name":"Washington","country":"USA","lat":38.91,"lng":-77.04},{"name":"Houston","country":"USA","lat":29.76,"lng":-95.37},{"name":"Honolulu","country":"USA","lat":21.31,"lng":-157.86},{"name":"Anchorage","country":"USA","lat":61.22,"lng":-149.9},{"name":"Toronto","country":"Canada","lat":43.65,"lng":-79.38},{"name":"Vancouver","country":"Canada","lat":49.28,"lng":-123.12},{"name":"Montreal","country":"Canada","lat":45.5,"lng":-73.57},{"name":"Ottawa","country":"Canada","lat":45.42,"lng":-75.7},{"name":"Calgary","country":"Canada","lat":51.05,"lng":-114.07},{"name":"Mexico City","country":"Mexico","lat":19.43,"lng":-99.13},{"name":"Cancun","country":"Mexico","lat":21.16,"lng":-86.85},{"name":"Guadalajara","country":"Mexico","lat":20.66,"lng":-103.35},{"name":"Havana","country":"Cuba","lat":23.11,"lng":-82.37},{"name":"Nassau","country":"Bahamas","lat":25.04,"lng":-77.35},{"name":"Kingston","country":"Jamaica","lat":17.97,"lng":-76.79},{"name":"San Juan","country":"Puerto Rico","lat":18.47,"lng":-66.11},{"name":"Panama City","country":"Panama","lat":8.98,"lng":-79.52},{"name":"San Jose","country":"Costa Rica","lat":9.93,"lng":-84.08},{"name":"Guatemala City","country":"Guatemala","lat":14.63,"lng":-90.53},{"name":"Sao Paulo","country":"Brazil","lat":-23.55,"lng":-46.63},{"name":"Rio de Janeiro","country":"Brazil","lat":-22.91,"lng":-43.17},{"name":"Brasilia","country":"Brazil","lat":-15.79,"lng":-47.88},{"name":"Buenos Aires","country":"Argentina","lat":-34.6,"lng":-58.38},{"name":"Santiago","country":"Chile","lat":-33.45,"lng":-70.67},{"name":"Lima","country":"Peru","lat":-12.05,"lng":-77.04},{"name":"Cusco","country":"Peru","lat":-13.53,"lng":-71.97},{"name":"Bogota","country":"Colombia","lat":4.71,"lng":-74.07},{"name":"Cartagena","country":"Colombia","lat":10.39,"lng":-75.51},{"name":"Quito","country":"Ecuador","lat":-0.18,"lng":-78.47},{"name":"Galapagos","country":"Ecuador","lat":-0.74,"lng":-90.31},{"name":"La Paz","country":"Bolivia","lat":-16.5,"lng":-68.15},{"name":"Montevideo","country":"Uruguay","lat":-34.9,"lng":-56.16},{"name":"Asuncion","country":"Paraguay","lat":-25.28,"lng":-57.63},{"name":"Caracas","country":"Venezuela","lat":10.48,"lng":-66.9},{"name":"Georgetown","country":"Guyana","lat":6.8,"lng":-58.16},{"name":"Sydney","country":"Australia","lat":-33.87,"lng":151.21},{"name":"Melbourne","country":"Australia","lat":-37.81,"lng":144.96},{"name":"Brisbane","country":"Australia","lat":-27.47,"lng":153.03},{"name":"Perth","country":"Australia","lat":-31.95,"lng":115.86},{"name":"Adelaide","country":"Australia","lat":-34.93,"lng":138.6},{"name":"Gold Coast","country":"Australia","lat":-28.02,"lng":153.4},{"name":"Cairns","country":"Australia","lat":-16.92,"lng":145.77},{"name":"Canberra","country":"Australia","lat":-35.28,"lng":149.13},{"name":"Auckland","country":"New Zealand","lat":-36.85,"lng":174.76},{"name":"Wellington","country":"New Zealand","lat":-41.29,"lng":174.78},{"name":"Queenstown","country":"New Zealand","lat":-45.03,"lng":168.66},{"name":"Suva","country":"Fiji","lat":-18.14,"lng":178.44},{"name":"Nadi","country":"Fiji","lat":-17.8,"lng":177.42},{"name":"Port Moresby","country":"Papua New Guinea","lat":-9.48,"lng":147.15},{"name":"Noumea","country":"New Caledonia","lat":-22.28,"lng":166.46},{"name":"Papeete","country":"Tahiti","lat":-17.54,"lng":-149.57},{"name":"Apia","country":"Samoa","lat":-13.83,"lng":-171.76},{"name":"Nuku'alofa","country":"Tonga","lat":-21.14,"lng":-175.2}];
 
 /* ---------- Design tokens ---------- */
-const COLORS = {
-  navyDeep: '#0f1830',
-  navy: '#16223f',
-  navyPanel: '#1b2a4a',
-  navyLine: '#2e3f63',
-  parchment: '#efe6d8',
-  paper: '#fbf8f2',
-  ember: '#e2703a',
-  emberDim: 'rgba(226,112,58,0.35)',
-  brass: '#c9a227',
-  fog: '#8b98ac',
+/* ---------- Map theme palettes ----------
+   Each theme is a complete color swap. Both the SVG interactive view and
+   the canvas export renderer read from the active COLORS, so a theme
+   switch updates everything. The 'vintage' theme is the original. */
+const THEME_PALETTES = {
+  vintage: {
+    navyDeep: '#0f1830',
+    navy: '#16223f',
+    navyPanel: '#1b2a4a',
+    navyLine: '#2e3f63',
+    parchment: '#efe6d8',
+    paper: '#fbf8f2',
+    ember: '#e2703a',
+    emberDim: 'rgba(226,112,58,0.35)',
+    brass: '#c9a227',
+    fog: '#8b98ac',
+  },
+  midnight: {
+    navyDeep: '#070b14',
+    navy: '#0d1320',
+    navyPanel: '#121a2b',
+    navyLine: '#1e2a3e',
+    parchment: '#1a2336',
+    paper: '#e8eef5',
+    ember: '#22d3ee',
+    emberDim: 'rgba(34,211,238,0.3)',
+    brass: '#67e8f9',
+    fog: '#5a6878',
+  },
+  daylight: {
+    navyDeep: '#2a3441',
+    navy: '#eef1f5',
+    navyPanel: '#e0e6ed',
+    navyLine: '#c4ccd6',
+    parchment: '#d4dbe3',
+    paper: '#ffffff',
+    ember: '#0d6efd',
+    emberDim: 'rgba(13,110,253,0.3)',
+    brass: '#f59f00',
+    fog: '#8a96a4',
+  },
 };
+
+const THEME_LABELS = {
+  vintage: 'Vintage',
+  midnight: 'Midnight',
+  daylight: 'Daylight',
+};
+
+let COLORS = THEME_PALETTES.vintage;
 
 const MAP_W = 1000;
 const MAP_H = 500;
@@ -632,6 +670,10 @@ export default function TravelRouteMap() {
   const [draggedId, setDraggedId] = useState(null); // stop id being dragged
   const [dragOverId, setDragOverId] = useState(null); // stop id being hovered
   const [highlightedSuggestion, setHighlightedSuggestion] = useState(null); // keyboard nav index
+  const [theme, setTheme] = useState(() => { try { return localStorage.getItem('flight-log:theme') || 'vintage'; } catch { return 'vintage'; } });
+
+  // Apply the active theme's colors to the module-level COLORS so both SVG + canvas pick it up
+  COLORS = THEME_PALETTES[theme] || THEME_PALETTES.vintage;
 
   // Decoded images ready for canvas drawing, keyed by stop id.
   const photoImagesRef = useRef({});
@@ -1010,6 +1052,11 @@ export default function TravelRouteMap() {
       }
     }
   }, [stops]);
+
+  // Persist the theme choice
+  useEffect(() => {
+    try { localStorage.setItem('flight-log:theme', theme); } catch { /* ignore */ }
+  }, [theme]);
 
   function handleKeyDown(e) {
     if (e.key === 'Enter') {
@@ -1833,6 +1880,18 @@ export default function TravelRouteMap() {
               >
                 <option value="horizontal">2:1 wide</option>
                 <option value="vertical">9:16 vertical</option>
+              </select>
+              <select
+                className="flg-speed"
+                value={theme}
+                onChange={(e) => setTheme(e.target.value)}
+                disabled={exporting}
+                aria-label="Map theme"
+                title="Map color theme"
+              >
+                {Object.entries(THEME_LABELS).map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
               </select>
               <button
                 className="flg-export-btn"
