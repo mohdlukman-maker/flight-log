@@ -585,6 +585,7 @@ export default function TravelRouteMap() {
   const [aspectRatio, setAspectRatio] = useState('horizontal'); // 'horizontal' | 'vertical'
   const [draggedId, setDraggedId] = useState(null); // stop id being dragged
   const [dragOverId, setDragOverId] = useState(null); // stop id being hovered
+  const [highlightedSuggestion, setHighlightedSuggestion] = useState(null); // keyboard nav index
 
   // Decoded images ready for canvas drawing, keyed by stop id.
   const photoImagesRef = useRef({});
@@ -762,6 +763,7 @@ export default function TravelRouteMap() {
     setQuery(v);
     setSelectedCity(null);
     setFormError('');
+    setHighlightedSuggestion(null);
     const q = v.trim().toLowerCase();
     if (q.length < 2) {
       setSuggestions([]);
@@ -773,9 +775,9 @@ export default function TravelRouteMap() {
       const n = c.name.toLowerCase();
       if (n.startsWith(q)) starts.push(c);
       else if (n.includes(q) || c.country.toLowerCase().includes(q)) contains.push(c);
-      if (starts.length >= 7) break;
+      if (starts.length >= 10) break;
     }
-    setSuggestions([...starts, ...contains].slice(0, 7));
+    setSuggestions([...starts, ...contains].slice(0, 10));
   }
 
   function pickSuggestion(c) {
@@ -967,14 +969,58 @@ export default function TravelRouteMap() {
     if (e.key === 'Enter') {
       e.preventDefault();
       if (suggestions.length > 0 && !selectedCity) {
-        pickSuggestion(suggestions[0]);
+        // Quick-add: pick the top suggestion and add it in one stroke.
+        pickSuggestionAndAdd(suggestions[highlightedSuggestion ?? 0]);
       } else {
         handleAdd();
       }
+    } else if (e.key === 'ArrowDown' && suggestions.length > 0 && !selectedCity) {
+      e.preventDefault();
+      setHighlightedSuggestion((h) => (h == null ? 1 : (h + 1) % suggestions.length));
+    } else if (e.key === 'ArrowUp' && suggestions.length > 0 && !selectedCity) {
+      e.preventDefault();
+      setHighlightedSuggestion((h) => (h == null ? suggestions.length - 1 : (h - 1 + suggestions.length) % suggestions.length));
     } else if (e.key === 'Escape' && suggestions.length > 0) {
       setSuggestions([]);
+      setHighlightedSuggestion(null);
       e.stopPropagation(); // don't let Escape close other things (modals, etc.)
     }
+  }
+
+  // Pick a suggestion and add the stop immediately — the one-keystroke path.
+  async function pickSuggestionAndAdd(city) {
+    setSelectedCity(city);
+    setQuery(`${city.name}, ${city.country}`);
+    setSuggestions([]);
+    setHighlightedSuggestion(null);
+    setFormError('');
+    // Add immediately with the picked city (no date — it's optional).
+    const stop = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      name: city.name,
+      country: city.country || '',
+      lat: city.lat,
+      lng: city.lng,
+      date: dateVal || '', // keep whatever date the user already typed
+      caption: '',
+      order: stops.length ? Math.max(...stops.map((s) => s.order)) + 1 : 0,
+    };
+    const isDuplicate = stops.some(
+      (s) => s.name === city.name && s.lat === city.lat && s.lng === city.lng && (!stop.date || s.date === stop.date)
+    );
+    if (isDuplicate) {
+      setFormError('That stop is already on your trip');
+      setQuery('');
+      return;
+    }
+    setStops((prev) => [...prev, stop]);
+    setQuery('');
+    setDateVal('');
+    setSelectedCity(null);
+    setSuggestions([]);
+    setHighlightedSuggestion(null);
+    setFormError('');
+    if (inputRef.current) inputRef.current.focus();
   }
 
   // Close the suggestion list when focus leaves the input — but wait a tick so
@@ -1232,7 +1278,16 @@ export default function TravelRouteMap() {
           gap: 10px;
         }
         .flg-suggestion:hover { background: ${COLORS.navyPanel}; }
+        .flg-suggestion-active { background: ${COLORS.navyPanel}; border-left: 2px solid ${COLORS.brass}; }
         .flg-suggestion span:last-child { color: ${COLORS.fog}; font-size: 12px; }
+        .flg-suggestion-hint {
+          padding: 6px 12px;
+          font-size: 10.5px;
+          color: ${COLORS.fog};
+          font-family: 'Space Mono', monospace;
+          border-top: 1px solid ${COLORS.navyLine};
+          opacity: 0.8;
+        }
 
         .flg-error {
           margin-top: 8px;
@@ -1478,12 +1533,17 @@ export default function TravelRouteMap() {
               />
               {suggestions.length > 0 && (
                 <div className="flg-suggestions">
-                  {suggestions.map((c) => (
-                    <div key={`${c.name}-${c.lat}`} className="flg-suggestion" onClick={() => pickSuggestion(c)}>
+                  {suggestions.map((c, si) => (
+                    <div
+                      key={`${c.name}-${c.lat}`}
+                      className={`flg-suggestion${si === (highlightedSuggestion ?? 0) ? ' flg-suggestion-active' : ''}`}
+                      onClick={() => pickSuggestionAndAdd(c)}
+                    >
                       <span>{c.name}</span>
                       <span>{c.country}</span>
                     </div>
                   ))}
+                  <div className="flg-suggestion-hint">↑↓ to navigate · Enter to add</div>
                 </div>
               )}
             </div>
