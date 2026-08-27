@@ -10,6 +10,10 @@ An animated travel-route map — a single-file React component that plots your t
 - Trip stats: total distance (haversine, km), trip duration, leg count
 - Hover / click pins for tooltips; chips list with remove
 - Persistence via host `window.storage` API (with graceful no-op if absent)
+- **Import / Export / Share**:
+  - Export trip data as a single JSON file.
+  - Import a previously exported JSON file to restore the trip.
+  - Copy a compact base64url-encoded share link to easily pass your route to others.
 
 ## Roadmap
 
@@ -17,7 +21,7 @@ An animated travel-route map — a single-file React component that plots your t
 - [ ] Cinematic MP4 export (WebCodecs + canvas renderer)
 - [ ] Optional dates + drag-to-reorder stops
 - [ ] Camera-follow zoom and great-circle arcs
-- [ ] Shareable trip links / JSON import-export
+- [x] Shareable trip links / JSON import-export
 - [x] Runnable Vite app + multi-stage Dockerfile (nginx)
 
 ## Usage
