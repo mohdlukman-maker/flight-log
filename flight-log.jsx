@@ -197,10 +197,75 @@ function deletePhoto(photoId) {
   }
 }
 
+/* ---------- Camera (Stage 4: vertical + camera-follow) ----------
+   Pure function computing the output viewport from the timeline.
+   Returns {cx, cy, zoom}: the map-space point at the center of the
+   output frame and the scale factor (1 = whole map visible).
+   During a leg the camera frames the active Bézier region; during a
+   stop pause it zooms in on the arrived pin. Deterministic — same t,
+   same camera. */
+const OUT_W = 562;  // 9:16 at half map-width scale
+const OUT_H = 1000;
+const HORIZ_W = 1000;
+const HORIZ_H = 500;
+
+function legBounds(bz) {
+  const minX = Math.min(bz.p0.x, bz.p1.x, bz.p2.x);
+  const maxX = Math.max(bz.p0.x, bz.p1.x, bz.p2.x);
+  const minY = Math.min(bz.p0.y, bz.p1.y, bz.p2.y);
+  const maxY = Math.max(bz.p0.y, bz.p1.y, bz.p2.y);
+  return { minX, maxX, minY, maxY };
+}
+
+function cameraAt(frame, legs, outW, outH) {
+  if (!legs.length) return { cx: MAP_W / 2, cy: MAP_H / 2, zoom: 1 };
+  const leg = legs[Math.min(frame.legIndex, legs.length - 1)];
+  const bz = leg.bz;
+
+  let cx, cy, zoom;
+
+  if (frame.pausedAtStopIndex !== null) {
+    // Dwelling at a stop: zoom onto the arrived pin.
+    const stopIdx = Math.min(frame.pausedAtStopIndex, legs.length); // stops.length when finished
+    // The arrived stop's position: pause after leg i = stop i+1 = leg[i].to
+    const pin = frame.pausedAtStopIndex >= legs.length ? bz.p2 : legs[frame.pausedAtStopIndex - 1].bz.p2;
+    cx = pin.x;
+    cy = pin.y;
+    zoom = Math.min(3.2, Math.max(2.2, (outW / MAP_W) * 4));
+  } else {
+    // Flying a leg: frame the whole leg with comfortable padding.
+    const b = legBounds(bz);
+    cx = (b.minX + b.maxX) / 2;
+    cy = (b.minY + b.maxY) / 2;
+    const legW = Math.max(b.maxX - b.minX, 40);
+    const legH = Math.max(b.maxY - b.minY, 40);
+    // zoom such that the leg's bounding box (plus padding) fits the output
+    const zoomX = outW / (legW * 1.9);
+    const zoomY = outH / (legH * 1.9);
+    zoom = Math.min(3.5, Math.max(0.8, Math.min(zoomX, zoomY)));
+  }
+
+  // Clamp the camera so we don't show empty space beyond the map edges.
+  const halfW = outW / (2 * zoom);
+  const halfH = outH / (2 * zoom);
+  cx = Math.max(halfW, Math.min(MAP_W - halfW, cx));
+  cy = Math.max(halfH, Math.min(MAP_H - halfH, cy));
+  if (outW / (2 * zoom) >= MAP_W / 2) cx = MAP_W / 2;
+  if (outH / (2 * zoom) >= MAP_H / 2) cy = MAP_H / 2;
+
+  return { cx, cy, zoom };
+}
+
+/** Smoothstep easing for camera blending between keyframes. */
+function smoothstep(t) {
+  const x = Math.max(0, Math.min(1, t));
+  return x * x * (3 - 2 * x);
+}
+
 /* ---------- Stop data model ----------
-   Stops are ordered manually via an `order` field (the real sort key).
-   `date` is an optional, display-only label. `caption` is an optional
-   one-line note shown in tooltips and (later) video postcard reveals.
+    Stops are ordered manually via an `order` field (the real sort key).
+    `date` is an optional, display-only label. `caption` is an optional
+    one-line note shown in tooltips and (later) video postcard reveals.
 
    Migration: legacy stops (pre-order field) are assigned order values
    based on their existing date-sort, so old saved trips load unchanged. */
@@ -252,13 +317,22 @@ function getLandPath2D() {
   return landPath2D;
 }
 
-function drawFrame(ctx, { frame, legs, sortedStops, totalKm, tripTitle, photoImages }) {
-  const W = MAP_W, H = MAP_H;
+function drawFrame(ctx, { frame, legs, sortedStops, totalKm, tripTitle, photoImages, outW = MAP_W, outH = MAP_H, useCamera = false, cam = null }) {
+  const W = outW, H = outH;
   ctx.clearRect(0, 0, W, H);
+
+  // ---- Map layer (optionally camera-transformed) ----
+  ctx.save();
+  if (useCamera && cam) {
+    // Camera transform: map-space (cx,cy) lands at output center, scaled by zoom.
+    ctx.translate(W / 2 - cam.cx * cam.zoom, H / 2 - cam.cy * cam.zoom);
+    ctx.scale(cam.zoom, cam.zoom);
+  }
+  const W_MAP = MAP_W, H_MAP = MAP_H;
 
   // Background
   ctx.fillStyle = COLORS.navy;
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillRect(0, 0, W_MAP, H_MAP);
 
   // Graticule
   ctx.strokeStyle = COLORS.fog;
@@ -266,14 +340,14 @@ function drawFrame(ctx, { frame, legs, sortedStops, totalKm, tripTitle, photoIma
   ctx.lineWidth = 0.5;
   ctx.beginPath();
   for (const lng of [-150, -120, -90, -60, -30, 0, 30, 60, 90, 120, 150]) {
-    const x = ((lng + 180) / 360) * W;
+    const x = ((lng + 180) / 360) * W_MAP;
     ctx.moveTo(x, 0);
-    ctx.lineTo(x, H);
+    ctx.lineTo(x, H_MAP);
   }
   for (const lat of [-60, -30, 0, 30, 60]) {
-    const y = ((90 - lat) / 180) * H;
+    const y = ((90 - lat) / 180) * H_MAP;
     ctx.moveTo(0, y);
-    ctx.lineTo(W, y);
+    ctx.lineTo(W_MAP, y);
   }
   ctx.stroke();
   ctx.globalAlpha = 1;
@@ -337,6 +411,9 @@ function drawFrame(ctx, { frame, legs, sortedStops, totalKm, tripTitle, photoIma
     ctx.stroke();
     ctx.restore();
   }
+  ctx.restore(); // end camera transform
+
+  // ---- Overlay layer (output coordinates) ----
 
   // Title card (top-left overlay)
   if (tripTitle) {
@@ -356,18 +433,18 @@ function drawFrame(ctx, { frame, legs, sortedStops, totalKm, tripTitle, photoIma
   }
 
   // Postcard reveal: when the plane is dwelling at a stop with a photo,
-  // draw the photo as a centered postcard overlay (right 2/3 of the frame,
-  // so the plane/pin stays visible on the left).
+  // draw the photo as a postcard overlay, sized to the output frame.
   if (frame.pausedAtStopIndex !== null && photoImages) {
     const stopIdx = frame.pausedAtStopIndex;
     const stop = sortedStops[stopIdx];
     if (stop) {
       const img = photoImages[stop.id];
       if (img && img.width > 0) {
-        // Postcard: 480x320, centered in right 60% of canvas
-        const pcW = 480, pcH = 320;
-        const pcX = W - pcW - 30;
-        const pcY = (H - pcH) / 2;
+        // Postcard sized relative to the output frame
+        const pcW = Math.min(480, W * 0.82);
+        const pcH = pcW * (2 / 3);
+        const pcX = (W - pcW) / 2;
+        const pcY = H * 0.5 - pcH / 2;
         // Shadow
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
         ctx.fillRect(pcX + 6, pcY + 6, pcW, pcH);
@@ -505,6 +582,7 @@ export default function TravelRouteMap() {
   const [exportProgress, setExportProgress] = useState(0); // 0..1
   const [photoUploading, setPhotoUploading] = useState(null); // stop id while compressing
   const [photoError, setPhotoError] = useState('');
+  const [aspectRatio, setAspectRatio] = useState('horizontal'); // 'horizontal' | 'vertical'
 
   // Decoded images ready for canvas drawing, keyed by stop id.
   const photoImagesRef = useRef({});
@@ -919,9 +997,13 @@ export default function TravelRouteMap() {
 
     try {
       const FPS = 30;
+      const vertical = aspectRatio === 'vertical';
+      const outW = vertical ? OUT_W : HORIZ_W;
+      const outH = vertical ? OUT_H : HORIZ_H;
+      const useCamera = vertical; // camera-follow only in vertical mode (Stage 4)
       const canvas = document.createElement('canvas');
-      canvas.width = MAP_W;
-      canvas.height = MAP_H;
+      canvas.width = outW;
+      canvas.height = outH;
       const ctx = canvas.getContext('2d');
 
       // Pick the best supported mime type.
@@ -940,7 +1022,12 @@ export default function TravelRouteMap() {
       // Render one warm-up frame before recording starts so the first
       // captured frame isn't blank.
       const title = sortedStops.length > 1 ? `${sortedStops[0].name} → ${sortedStops[sortedStops.length - 1].name}` : sortedStops[0]?.name || 'Trip';
-      drawFrame(ctx, { frame: stateAt(0, legs), legs, sortedStops, totalKm, tripTitle: title, photoImages: photoImagesRef.current });
+      drawFrame(ctx, {
+        frame: stateAt(0, legs), legs, sortedStops, totalKm,
+        tripTitle: title, photoImages: photoImagesRef.current,
+        outW, outH, useCamera,
+        cam: useCamera ? cameraAt(stateAt(0, legs), legs, outW, outH) : null,
+      });
 
       const stream = canvas.captureStream(FPS);
       const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 });
@@ -961,7 +1048,12 @@ export default function TravelRouteMap() {
           const elapsed = performance.now() - t0;
           const t = Math.min(1, elapsed / totalMs);
           const frame = stateAt(t, legs);
-          drawFrame(ctx, { frame, legs, sortedStops, totalKm, tripTitle: title, photoImages: photoImagesRef.current });
+          drawFrame(ctx, {
+            frame, legs, sortedStops, totalKm,
+            tripTitle: title, photoImages: photoImagesRef.current,
+            outW, outH, useCamera,
+            cam: useCamera ? cameraAt(frame, legs, outW, outH) : null,
+          });
           setExportProgress(t);
           if (t >= 1) {
             resolve();
@@ -1579,6 +1671,17 @@ export default function TravelRouteMap() {
                 <option value={1}>1×</option>
                 <option value={2}>2×</option>
                 <option value={4}>4×</option>
+              </select>
+              <select
+                className="flg-speed"
+                value={aspectRatio}
+                onChange={(e) => setAspectRatio(e.target.value)}
+                disabled={exporting}
+                aria-label="Video aspect ratio"
+                title="Export format"
+              >
+                <option value="horizontal">2:1 wide</option>
+                <option value="vertical">9:16 vertical</option>
               </select>
               <button
                 className="flg-export-btn"
