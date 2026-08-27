@@ -297,11 +297,15 @@ function sortStops(stops) {
     return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
   });
 }
-/* ---------- Small plane glyph, nose points to +x (east) at rotation 0 ---------- */
+/* ---------- Small plane glyph, nose points to +x (east) at rotation 0 ----------
+   A proper twin-engine aircraft silhouette: fuselage, swept wings, tail.
+   Designed at ~20px wingspan; reads as "airplane" at the map scale. */
+const PLANE_PATH = 'M 10,0 L 4,-1.2 L 1,-6 L -1,-6 L -1.5,-2 L -5,-3.5 L -6,-3 L -4,-1 L -6.5,-0.8 L -9,-2.5 L -11,-2 L -9,-0.3 L -11,0.3 L -9,2 L -11,2.5 L -9,2.5 L -6.5,0.8 L -4,1 L -6,3 L -5,3.5 L -1.5,2 L -1,6 L 1,6 L 4,1.2 Z';
+
 function PlaneGlyph({ x, y, angle, color }) {
   return (
     <g transform={`translate(${x.toFixed(1)},${y.toFixed(1)}) rotate(${angle.toFixed(1)})`}>
-      <path d="M -11,-4.5 L 9,0 L -11,4.5 L -6.5,0 Z" fill={color} stroke={COLORS.navyDeep} strokeWidth="0.7" />
+      <path d={PLANE_PATH} fill={color} stroke={COLORS.navyDeep} strokeWidth="0.5" strokeLinejoin="round" />
     </g>
   );
 }
@@ -315,6 +319,12 @@ let landPath2D = null;
 function getLandPath2D() {
   if (!landPath2D) landPath2D = new Path2D(LAND_PATH);
   return landPath2D;
+}
+
+let planePath2D = null;
+function getPlanePath2D() {
+  if (!planePath2D) planePath2D = new Path2D(PLANE_PATH);
+  return planePath2D;
 }
 
 function drawFrame(ctx, { frame, legs, sortedStops, totalKm, tripTitle, photoImages, outW = MAP_W, outH = MAP_H, useCamera = false, cam = null }) {
@@ -359,12 +369,29 @@ function drawFrame(ctx, { frame, legs, sortedStops, totalKm, tripTitle, photoIma
   ctx.fill(getLandPath2D());
   ctx.stroke(getLandPath2D());
 
-  // Route legs (dashed)
+  // Route legs: contrail glow under flown/current + main line (dashed for future)
   legs.forEach((leg, i) => {
     const bz = leg.bz;
-    ctx.strokeStyle = i === frame.legIndex ? COLORS.ember : COLORS.emberDim;
-    ctx.lineWidth = i === frame.legIndex ? 1.6 : 1.1;
-    ctx.setLineDash([4, 3]);
+    const isCurrent = i === frame.legIndex;
+    const isPast = i < frame.legIndex;
+    const isFuture = i > frame.legIndex;
+    // Contrail glow
+    if (isPast || isCurrent) {
+      ctx.strokeStyle = COLORS.ember;
+      ctx.globalAlpha = isCurrent ? 0.18 : 0.1;
+      ctx.lineWidth = isCurrent ? 5 : 3.5;
+      ctx.setLineDash([]);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(bz.p0.x, bz.p0.y);
+      ctx.quadraticCurveTo(bz.p1.x, bz.p1.y, bz.p2.x, bz.p2.y);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    // Main line
+    ctx.strokeStyle = isFuture ? COLORS.emberDim : COLORS.ember;
+    ctx.lineWidth = isCurrent ? 1.8 : isPast ? 1.4 : 1.1;
+    ctx.setLineDash(isFuture ? [4, 3] : []);
     ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.moveTo(bz.p0.x, bz.p0.y);
@@ -392,23 +419,18 @@ function drawFrame(ctx, { frame, legs, sortedStops, totalKm, tripTitle, photoIma
     ctx.fillText(String(i + 1), p.x, p.y + 0.5);
   });
 
-  // Plane glyph (nose points +x at rotation 0)
+  // Plane glyph (proper aircraft silhouette, nose points +x at rotation 0)
   if (frame.plane) {
     const { x, y, angle } = frame.plane;
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate((angle * Math.PI) / 180);
-    ctx.beginPath();
-    ctx.moveTo(-11, -4.5);
-    ctx.lineTo(9, 0);
-    ctx.lineTo(-11, 4.5);
-    ctx.lineTo(-6.5, 0);
-    ctx.closePath();
     ctx.fillStyle = COLORS.ember;
-    ctx.fill();
+    ctx.fill(getPlanePath2D());
     ctx.strokeStyle = COLORS.navyDeep;
-    ctx.lineWidth = 0.7;
-    ctx.stroke();
+    ctx.lineWidth = 0.5;
+    ctx.lineJoin = 'round';
+    ctx.stroke(getPlanePath2D());
     ctx.restore();
   }
   ctx.restore(); // end camera transform
@@ -1667,17 +1689,36 @@ export default function TravelRouteMap() {
             ))}
             <path d={LAND_PATH} fill={COLORS.parchment} fillRule="evenodd" stroke={COLORS.navyDeep} strokeWidth={0.6} />
 
-            {legs.map((leg, i) => (
-              <path
-                key={`${leg.from.id}-${leg.to.id}`}
-                d={leg.d}
-                fill="none"
-                stroke={i === frame.legIndex ? COLORS.ember : COLORS.emberDim}
-                strokeWidth={i === frame.legIndex ? 1.6 : 1.1}
-                strokeDasharray="4 3"
-                strokeLinecap="round"
-              />
-            ))}
+            {legs.map((leg, i) => {
+              const isCurrent = i === frame.legIndex;
+              const isPast = i < frame.legIndex;
+              const isFuture = i > frame.legIndex;
+              return (
+                <g key={`${leg.from.id}-${leg.to.id}`}>
+                  {/* Contrail glow: wide, semi-transparent stroke under the
+                      flown/current legs — like a jet contrail on the map. */}
+                  {(isPast || isCurrent) && (
+                    <path
+                      d={leg.d}
+                      fill="none"
+                      stroke={COLORS.ember}
+                      strokeWidth={isCurrent ? 5 : 3.5}
+                      strokeOpacity={isCurrent ? 0.18 : 0.1}
+                      strokeLinecap="round"
+                    />
+                  )}
+                  {/* Main route line: solid for past/current, dashed for future */}
+                  <path
+                    d={leg.d}
+                    fill="none"
+                    stroke={isFuture ? COLORS.emberDim : COLORS.ember}
+                    strokeWidth={isCurrent ? 1.8 : isPast ? 1.4 : 1.1}
+                    strokeDasharray={isFuture ? '4 3' : 'none'}
+                    strokeLinecap="round"
+                  />
+                </g>
+              );
+            })}
 
             {sortedStops.map((s, i) => {
               const p = project(s.lat, s.lng);
